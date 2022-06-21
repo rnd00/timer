@@ -45,6 +45,7 @@ func Ticking(done chan bool, title, message string) *time.Ticker {
 			case <-done:
 				return
 			case <-ticker.C:
+				log.Println("Sending notification;", title, message)
 				notify.Notify(title, message)
 			}
 		}
