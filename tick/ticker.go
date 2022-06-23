@@ -2,10 +2,11 @@ package tick
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/rnd00/timer/logger"
 	"github.com/rnd00/timer/notify"
 )
 
@@ -14,37 +15,44 @@ type ticker struct {
 	WaitGroup     *sync.WaitGroup
 	TickerObject  *time.Ticker
 	MessageObject notify.Message
+	LoggerObject  logger.Logger
 }
 
 type Ticker interface {
 	Ticking()
 }
 
-func New(ctx context.Context, wg *sync.WaitGroup, tickerObj *time.Ticker, msgObj notify.Message) Ticker {
+// New will make a new struct of ticker
+// which later can be used to run reminders
+func New(ctx context.Context, wg *sync.WaitGroup, cl logger.Logger, tickerObj *time.Ticker, msgObj notify.Message) Ticker {
 	return &ticker{
 		Context:       ctx,
 		WaitGroup:     wg,
 		TickerObject:  tickerObj,
 		MessageObject: msgObj,
+		LoggerObject:  cl,
 	}
 }
 
+// Ticking will run and blocking to wait for channels
 func (t *ticker) Ticking() {
 	defer t.WaitGroup.Done()
-	log.Printf("Ticking Start")
+	t.LoggerObject.Send("Ticking Start")
 	for {
 		select {
 		case <-t.Context.Done():
-			log.Println("Breaking the ticking loop")
+			// add the empty line first
+			logger.Println("Ticker: Done triggered")
+			logger.Println("Breaking the ticking loop")
 			t.TickerObject.Stop()
 			return
 		case <-t.TickerObject.C:
-			log.Printf("SendingNotification:\n\tTITLE: %s\n\tTEXT: %s", t.MessageObject.GetTitle(), t.MessageObject.GetText())
+			t.LoggerObject.Send(fmt.Sprintf("SendingNotification:\n\tTITLE: %s\n\tTEXT: %s", t.MessageObject.GetTitle(), t.MessageObject.GetText()))
 			if err := t.MessageObject.Notify(); err != nil {
-				log.Printf("Error while sending message; continue to the next loop")
+				t.LoggerObject.Send(fmt.Sprintf("Error while sending message; continue to the next loop"))
 				continue
 			}
-			log.Println("Notification printed without error")
+			t.LoggerObject.Send("Notification printed without error")
 		}
 	}
 }
